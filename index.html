@@ -1,0 +1,155 @@
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.15.0/maps/maps.css"/>
+        <script type="text/javascript"
+            src="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.15.0/maps/maps-web.min.js"></script>
+        <title>CoPilot</title>
+    </head>
+    
+    <body>
+        <div id="map" style="width: 100%; height: 100%; position: relative">
+            <div id="main">
+                <div style="width: 300; height: 300; position: absolute; top: 25; left: 25; z-index:1; border-radius: 15%; background-color: #77c3ec;">
+                    <input type="text" v-model="routeInfo.startingLoc" placeholder="Starting Coordinates: " style="margin-top: 25; margin-left: 50; transform: scale(1.25)"><br/>
+                    <input type="text" v-model="routeInfo.destination" placeholder="Destination Coordinates: " style="margin-top: 25; margin-left: 50; transform: scale(1.25)"><br/>
+                    <input type="checkbox" v-model="routeInfo.avoidTolls" style="margin-top: 25; margin-left: 35; transform: scale(1.25)">
+                    <label style="font-size: 20">Avoid Tolls</label><br/>
+                    <input type="checkbox" v-model="routeInfo.avoidHighways" style="margin-top: 25; margin-left: 35; transform: scale(1.25)">
+                    <label style="font-size: 20">Avoid Highways</label><br/>
+    
+                    <button v-on:click="calculateRoute" style="margin-top: 25; margin-left: 50; transform: scale(1.25)">Calculate Route</button>
+                </div>
+
+                <div style="width: 300; height: 100%; position: absolute; top: 0; right: 0; z-index:1; background-color: #77c3ec;">
+                    <label style="margin-left: 25; font-size: 20">Directions</label>
+                    <ul style="width: 250; height: 90%; overflow: auto">
+                        <li v-for="(direction, key) in directions" style="margin-top: 10">
+                            <label style="font-size: 16">{{direction}}</label>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="route" style="width: 300; height: 300; position: absolute; top: 350; left: 25; z-index:1; border-radius: 15%; background-color: #77c3ec;">
+                <button v-on:click="addStop" style="margin-top: 25; margin-left: 35; transform: scale(1.25)">+</button>
+                <input id="stopInput" type="text" v-model="newStop" placeholder="Stop Coordinates: " style="margin-top: 25; margin-left: 25; transform: scale(1.25)"/>
+                <ul style="width: 250; height: 200; list-style-type: none; overflow: auto">
+                    <li v-for="(stop, key) in stops">
+                        <button v-on:click="removeStop(key)" style="margin-top: 10; margin-left: 0; transform: scale(1.25)">-</button>
+                        <label style="font-size: 20; margin-left: 10">{{stop}}</label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </body>
+    
+    <script type="text/javascript">
+        var defaultMap = tt.map({
+            key: "XviSv28ejrVn8NJ06OqIR0vxZBJQ4U1J",
+            container: "map",
+            center: [-98.5795, 39.828175],
+            zoom: 10
+            })
+
+        function loadNewMap(startCoords, stops, endCoords) {
+            var map = tt.map({
+            key: "XviSv28ejrVn8NJ06OqIR0vxZBJQ4U1J",
+            container: "map",
+            center: startCoords,
+            zoom: 10
+            })
+            
+            new tt.Marker().setLngLat(startCoords).addTo(map)
+            if (stops.length > 0)
+            {
+                stops = stops.slice(0, -1)
+                for (var i = 0; i < stops.split(':').length; i++)
+                {
+                    var stopCoords = stops.split(':')[i].split(',')
+                    if (stopCoords.length > 0)
+                    {
+                        console.log(stopCoords)
+                        new tt.Marker().setLngLat([stopCoords[1], stopCoords[0]]).addTo(map)
+                    }
+                }
+            }
+            new tt.Marker().setLngLat(endCoords).addTo(map)
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+
+    <script>
+        var main = new Vue({
+            el: '#main',
+            data: {
+                routeInfo: {
+                    startingLoc: "",
+                    destination: "",
+                    avoidTolls: false,
+                    avoidHighways: false
+                },
+                request: "",
+                result: {},
+                directions: []
+            },
+            methods: {
+                async calculateRoute() {
+                    this.directions = []
+                    var routePlanningStops = ""
+                    if (route.stops.length)
+                    for (var i = 0; i < route.stops.length; i++)
+                    {
+                        routePlanningStops = routePlanningStops + route.stops[i] + ':'
+                    }
+                    this.request = 'https://api.tomtom.com/routing/1/calculateRoute/' + this.routeInfo.startingLoc + ':' + routePlanningStops + this.routeInfo.destination + '/json?key=XviSv28ejrVn8NJ06OqIR0vxZBJQ4U1J&instructionsType=text&language=en-US'
+                    console.log(this.request)
+                    if (this.routeInfo.avoidTolls)
+                    {
+                        this.request = this.request + '&avoid=tollRoads'
+                    }
+
+                    if (this.routeInfo.avoidHighways)
+                    {
+                        this.request = this.request + '&avoid=motorways'
+                    }
+                    
+                    try {
+                        const response = await fetch(this.request)
+                        this.result = await response.json()
+                        console.log(this.result.routes[0].summary.travelTimeInSeconds / 60 + " minutes")
+                        var messageList = this.result.routes[0].guidance.instructions
+                        for (var i = 0; i < messageList.length; i++)
+                        {
+                            this.directions.push(messageList[i].message)
+                        }
+
+                        var startCoords = this.routeInfo.startingLoc.split(',')
+                        var endCoords = this.routeInfo.destination.split(',')
+                        loadNewMap([startCoords[1], startCoords[0]], routePlanningStops, [endCoords[1], endCoords[0]])
+                    }
+                    catch (error)
+                    {
+                        console.error(error)
+                    }
+                }
+            }
+        })
+        var route = new Vue({
+            el: '#route',
+            data: {
+                newStop: "",
+                stops: []
+            },
+            methods: {
+                addStop() {
+                    this.stops.push(this.newStop)
+                    this.newStop=""
+                },
+                removeStop(index) {
+                    this.stops.splice(index, 1)
+                }
+            }
+        })
+    </script>
+</html>
